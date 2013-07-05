@@ -1,0 +1,42 @@
+10
+
+dir
+6
+http://jsocks-mirror.googlecode.com/svn/trunk/third-party
+http://jsocks-mirror.googlecode.com/svn
+delete
+
+
+2009-01-08T19:55:57.930931Z
+3
+raycolline
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+211b0d8c-dc64-11dd-8561-ef618b9164eb
+
+apache-commons-lang
+dir
+
+
+
+delete
+
+apache-log4j
+dir
+
+
+
+delete
+

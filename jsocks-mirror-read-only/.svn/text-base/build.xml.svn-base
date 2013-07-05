@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project 
+    name="jsocks" 
+    default="compile"
+    basedir=".">
+
+  <property name="version" value="1.0"/>
+
+  <!-- Define Directories. -->
+  <property name="projects.dir" value=".." />
+  <property name="COMPILE_DEBUG_FLAG" value="true" />
+  <property name="COMPILE_DEBUG_LEVEL" value="source,lines,vars" />
+
+  <property name="build" value="build" />
+  <property name="dist" value="dist" />
+  <property name="src" value="src/java" />
+
+  <property 
+      name="jarfile" 
+      value="jsocks.jar" />
+  <property 
+      name="src.jarfile" 
+      value="jsocks-src.jar" />
+  <property 
+      name="binarydistro.tarfile"
+      value="${dist}/jsocks-${version}-${TODAY}-bin.tar.gz" />
+  <property 
+      name="sourcedistro.tarfile"
+      value="${dist}/jsocks-${version}-${TODAY}-src.tar.gz" />
+
+  <target name="init">    
+    <mkdir dir="${build}" />
+  </target>
+
+  <target name="clean" description="Deletes all build files.">
+    <delete dir="${build}" />
+    <delete file="${jarfile}" />
+    <delete file="${src.jarfile}" />
+  </target>
+
+  <target name="compile" depends="init">
+    <javac 
+        srcdir="${src}" 
+        destdir="${build}"
+        debug="${COMPILE_DEBUG_FLAG}"
+        debuglevel="${COMPILE_DEBUG_LEVEL}"
+        includes="net/sourceforge/jsocks/**"
+        target="1.6"
+        source="1.6">
+      <classpath>
+        <pathelement path="third-party/apache-log4j/log4j-1.2.15.jar"/>
+        <pathelement path="third-party/apache-commons-lang/commons-lang-2.4.jar"/>
+        <pathelement path="third-party/json/json.jar"/>
+      </classpath>
+    </javac>
+
+    <jar jarfile="${jarfile}">
+      <fileset dir="${build}" includes="net/sourceforge/jsocks/**"/>
+      <manifest>
+        <attribute name="Implementation-Title" value="Sourceforge JSOCKS"/>
+        <attribute name="Implementation-Version" value="${version} ${TODAY}"/>
+        <attribute name="Implementation-Vendor" value="Sourceforge"/>
+        <attribute name="Main-Class" value="net.sourceforge.jsocks.SOCKS"/>
+      </manifest>
+    </jar>
+
+    <jar jarfile="${src.jarfile}">
+      <fileset dir="${src}">
+        <include name="**"/>
+      </fileset>
+      <manifest>
+        <attribute name="Implementation-Title" value="Sourceforge JSOCKS"/>
+        <attribute name="Implementation-Version" value="${version} ${TODAY}"/>
+        <attribute name="Implementation-Vendor" value="Sourceforge"/>
+      </manifest>
+    </jar>
+  </target>
+
+  <target name="timestamp">
+    <tstamp>
+      <format property="timestamp" pattern="MMddyyyyhhmm"/>
+    </tstamp>
+  </target>
+
+  <!-- Source Distribution -->
+  <target name="source-tar" depends="clean, timestamp">
+    <mkdir dir="${dist}" />
+    <tstamp/>
+    <tar
+      longfile="gnu"
+      destfile="${dist}/jsocks-${version}-${timestamp}-src.tar.gz" 
+      compression="gzip">
+      <tarfileset dir="${basedir}" prefix="jsocks-${version}">
+        <include name="**"/>
+        <exclude name="dist/**"/>
+        <exclude name="runjsocks.sh"/>
+      </tarfileset>
+      <tarfileset dir="${basedir}" prefix="jsocks-${version}" mode="755">
+        <include name="runjsocks.sh"/>
+      </tarfileset>
+    </tar>
+  </target>
+
+  <!-- Binary Distribution -->
+  <target name="binary-tar" depends="compile, timestamp">
+    <mkdir dir="${dist}" />
+    <tstamp/>
+    <tar
+      longfile="gnu"
+      destfile="${dist}/jsocks-${version}-${timestamp}-bin.tar.gz" 
+      compression="gzip">
+      <tarfileset dir="${basedir}" prefix="jsocks-${version}">
+        <include name="*"/>
+        <include name="third-party/**"/>
+        <exclude name="build.xml"/>
+        <exclude name="dist/**"/>
+        <exclude name="src/**"/>
+        <exclude name="build/**"/>
+        <exclude name="runjsocks.sh"/>
+      </tarfileset>
+      <tarfileset dir="${basedir}" prefix="jsocks-${version}" mode="755">
+        <include name="runjsocks.sh"/>
+      </tarfileset>
+      <tarfileset 
+          dir="${basedir}/src/java/net/sourceforge/jsocks"
+          prefix="jsocks-${version}">
+        <include 
+            name="socks.properties" />
+      </tarfileset>
+    </tar>
+  </target>
+</project>
+
