@@ -1,12 +1,16 @@
 package net.sourceforge.jsocks;
 
-import java.util.*;
-import java.io.*;
-import java.net.*;
-
+import net.sourceforge.jsocks.socks.InetRange;
 import net.sourceforge.jsocks.socks.Proxy;
-import net.sourceforge.jsocks.socks.*;
-import net.sourceforge.jsocks.socks.server.*;
+import net.sourceforge.jsocks.socks.ProxyServer;
+import net.sourceforge.jsocks.socks.server.IdentAuthenticator;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Hashtable;
+import java.util.Properties;
+import java.util.StringTokenizer;
 
 public class SOCKS{
 
@@ -103,10 +107,12 @@ public class SOCKS{
       Properties pr = new Properties();
 
       try{
-         InputStream fin = new FileInputStream(file_name);
+          System.out.println(SOCKS.class.getClassLoader().getResource(file_name).getFile());
+         InputStream fin = SOCKS.class.getClassLoader().getResourceAsStream(file_name);
          pr.load(fin);
          fin.close();
-      }catch(IOException ioe){
+      }catch(Exception ioe){
+          ioe.printStackTrace();
          return null;
       }
       return pr;
