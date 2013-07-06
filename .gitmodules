@@ -1,0 +1,3 @@
+[submodule "jsocks"]
+	path = jsocks
+	url = git@github.com:code4craft/jsocks.git
