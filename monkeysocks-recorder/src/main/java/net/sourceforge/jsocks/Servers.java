@@ -106,7 +106,7 @@ public class Servers {
 
 
         inform("Using Ident Authentication scheme:\n"+auth+"\n");
-        ManipulatedProxyServer server = new ManipulatedProxyServer(auth, ManipulatedProxyServer.ManipulateStat.NONE);
+        ManipulatedProxyServer server = new ManipulatedProxyServer(auth, ManipulatedProxyServer.ManipulateStat.RECORD);
         server.start(port,5,localIP);
     }
 

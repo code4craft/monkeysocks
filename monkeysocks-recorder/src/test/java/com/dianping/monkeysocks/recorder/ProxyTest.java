@@ -6,6 +6,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 
 /**
@@ -25,5 +26,25 @@ public class ProxyTest {
         urlConnection.connect();
         String s = IOUtils.toString(urlConnection.getInputStream());
         System.out.println(s.length());
+    }
+
+    @Test
+    public void byteBuffer(){
+        ByteBuffer buffer = ByteBuffer.allocate(10);
+        for (int i = 0; i < buffer.capacity(); i++) {
+            buffer.put((byte)i);
+        }
+        buffer.flip();
+        buffer.put((byte)10);
+        for (int i = 0; i < 5; i++) {
+            System.out.println(buffer.get());
+        }
+        buffer.flip();
+        for (int i = 0; i < 5; i++) {
+            System.out.println(buffer.get());
+        }
+        buffer.position(3);
+        buffer.limit(7);
+        ByteBuffer slice = buffer.slice();
     }
 }

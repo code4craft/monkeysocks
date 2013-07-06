@@ -1,11 +1,20 @@
 package net.sourceforge.jsocks.socks;
 
+import com.dianping.monkeysocks.cache.EhcacheClient;
+import com.dianping.monkeysocks.manipulate.ProtocalHandler;
 import net.sourceforge.jsocks.socks.server.ServerAuthenticator;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.*;
 import java.net.*;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * SOCKS4 and SOCKS5 proxy, handles both protocols simultaniously.
@@ -44,19 +53,42 @@ public class ManipulatedProxyServer implements Runnable {
         NONE, RECORD, REPLAY;
     }
 
-    static final int BUF_SIZE = 8192;
+    BlockingDeque<Window> taskQueue = new LinkedBlockingDeque<Window>();
+
+    BlockingDeque<Window> readWindowQueue = new LinkedBlockingDeque<Window>();
+
+    BlockingDeque<Window> writeWindowQueue = new LinkedBlockingDeque<Window>();
+
+    static class Window {
+        String key;
+        int length;
+        byte[] data;
+
+        Window(byte[] data, int length) {
+            this.data = data;
+            this.length = length;
+            this.key = DigestUtils.md5Hex(data);
+        }
+    }
+
+    static final int BUF_SIZE = 1024;
+
+    static final int WINDOWS_SIZE = 1024;
 
     Thread pipe_thread1, pipe_thread2;
     long lastReadTime;
 
     static int iddleTimeout = 180000; //3 minutes
     static int acceptTimeout = 180000; //3 minutes
+    ByteBuffer readBuffer = ByteBuffer.allocate(WINDOWS_SIZE * 200);
 
     private static final Logger LOG = Logger.getLogger(ProxyServer.class);
 
     static Proxy proxy;
 
     private String connectionId;
+
+    private volatile ProtocalHandler protocalHandler;
 
 
 //Public Constructors
@@ -177,7 +209,7 @@ public class ManipulatedProxyServer implements Runnable {
                 String connectionId = newConnectionId();
                 LOG.info(connectionId + " Accepted from:" +
                         s.getInetAddress().getHostName() + ":" + s.getPort());
-                ProxyServer ps = new ProxyServer(auth, s, connectionId);
+                ManipulatedProxyServer ps = new ManipulatedProxyServer(auth, s, connectionId, manipulateStat);
                 (new Thread(ps)).start();
             }
         } catch (IOException ioe) {
@@ -230,6 +262,7 @@ public class ManipulatedProxyServer implements Runnable {
                     writeToClient();
                 } catch (IOException ioe) {
                     //log("Accept exception:"+ioe);
+                    ioe.printStackTrace();
                     handleException(ioe);
                 } finally {
                     abort();
@@ -240,6 +273,7 @@ public class ManipulatedProxyServer implements Runnable {
                 try {
                     writeToClient();
                 } catch (IOException ioe) {
+                    ioe.printStackTrace();
                 } finally {
                     abort();
                     LOG.debug(connectionId + " Support thread(remote->client) stopped");
@@ -570,12 +604,112 @@ public class ManipulatedProxyServer implements Runnable {
     public void readFromClient() throws IOException {
         if (manipulateStat == ManipulateStat.NONE) {
             pipe(in, remote_out);
+        } else if (manipulateStat == ManipulateStat.RECORD) {
+            readWindow(in, readWindowQueue);
+            Window window;
+            while ((window = readWindowQueue.poll()) != null) {
+                taskQueue.add(window);
+                remote_out.write(window.data);
+                remote_out.flush();
+            }
+        } else if (manipulateStat == ManipulateStat.REPLAY) {
+            readWindow(in, readWindowQueue);
+            Window window;
+            while ((window = readWindowQueue.poll()) != null) {
+                taskQueue.add(window);
+            }
+        }
+    }
+
+    private Window readFromQueue(BlockingDeque<Window> taskQueue) {
+        Window take = null;
+        try {
+            take = taskQueue.take();
+            return take;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return readFromQueue(taskQueue);
         }
     }
 
     public void writeToClient() throws IOException {
         if (manipulateStat == ManipulateStat.NONE) {
             pipe(remote_in, out);
+        } else if (manipulateStat == ManipulateStat.RECORD) {
+            Window window;
+            StringBuilder sb = new StringBuilder();
+            while ((window = readFromQueue(taskQueue)) != null) {
+                sb.append(window.key);
+            }
+            String key = sb.toString();
+            Thread thread = new Thread(){
+                @Override
+                public void run() {
+                    try {
+                        readWindow(remote_in, writeWindowQueue);
+                    } catch (IOException e) {
+                        e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                    }
+                }
+            };
+            thread.start();
+            List<Window> list = new ArrayList<Window>();
+            while ((window = readFromQueue(taskQueue)) != null) {
+                list.add(window);
+            }
+            LOG.debug("save " + key + " to cache " + list);
+            EhcacheClient.instance().set(key, list, Integer.MAX_VALUE);
+            for (Window window1 : list) {
+                out.write(window1.data);
+                out.flush();
+            }
+        } else if (manipulateStat == ManipulateStat.REPLAY) {
+            Window window;
+            StringBuilder sb = new StringBuilder();
+            while ((window = readFromQueue(taskQueue)) != null) {
+                sb.append(window.key);
+            }
+            String key = sb.toString();
+            List<Window> list = EhcacheClient.instance().get(key);
+            for (Window window1 : list) {
+                out.write(window1.data);
+                out.flush();
+            }
+        }
+    }
+
+    private void readWindow(InputStream in, BlockingDeque<Window> windowQueue) throws IOException {
+        lastReadTime = System.currentTimeMillis();
+        byte[] buf = new byte[BUF_SIZE];
+        int len = 0;
+        while (len >= 0) {
+            try {
+                len = in.read(buf);
+                readBuffer.put(buf, 0, len);
+                lastReadTime = System.currentTimeMillis();
+                int length = readBuffer.position();
+                readBuffer.flip();
+                for (int i = 0; i < (length - 1) / WINDOWS_SIZE + 1; i++) {
+                    byte[] data = new byte[WINDOWS_SIZE];
+                    for (int j = 0; j < WINDOWS_SIZE; j++) {
+                        try {
+                            data[i] = readBuffer.get();
+                        } catch (BufferUnderflowException e) {
+                            break;
+                        }
+                    }
+                    windowQueue.add(new Window(data, WINDOWS_SIZE));
+                }
+                readBuffer.clear();
+            } catch (InterruptedIOException iioe) {
+                if (iddleTimeout == 0) return;//Other thread interrupted us.
+                long timeSinceRead = System.currentTimeMillis() - lastReadTime;
+                if (timeSinceRead >= iddleTimeout - 1000) //-1s for adjustment.
+                    return;
+                len = 0;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
