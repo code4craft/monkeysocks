@@ -17,14 +17,7 @@
             <email>yihua.huang@dianping.com</email>
         </developer>
     </developers>
-
-    <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-            </resource>
-        </resources>
-
-    </build>
-
+    <modules>
+        <module>./monkeysocks-recorder</module>
+    </modules>
 </project>
