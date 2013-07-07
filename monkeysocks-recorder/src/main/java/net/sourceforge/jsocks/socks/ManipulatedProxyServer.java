@@ -5,7 +5,6 @@ import com.dianping.monkeysocks.manipulate.ProtocalHandler;
 import net.sourceforge.jsocks.socks.server.ServerAuthenticator;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.*;
@@ -627,18 +626,24 @@ public class ManipulatedProxyServer implements Runnable {
         } else if (manipulateStat == ManipulateStat.RECORD) {
             readWindowOut(remote_in, writeWindowQueue);
         } else if (manipulateStat == ManipulateStat.REPLAY) {
+            String lastKey = "";
             while (true) {
                 lastReadTime = System.currentTimeMillis();
                 String key0 = getKey();
-                List<Window> list = EhcacheClient.instance().get(key0);
-                if (list != null) {
-                    for (Window window1 : list) {
-                        out.write(window1.data);
-                        out.flush();
+                if (!lastKey.equals(key0)) {
+                    lastKey = key0;
+                    List<Window> list = EhcacheClient.instance().get(key0);
+                    LOG.debug("get cache key " + key0);
+                    if (list != null) {
+                        LOG.debug("get " + list.size() + " records from cache " + key0);
+                        for (Window window1 : list) {
+                            out.write(window1.data);
+                            out.flush();
+                        }
                     }
                 }
                 try {
-                    Thread.sleep(10);
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                     if (iddleTimeout == 0) return;//Other thread interrupted us.
                     long timeSinceRead = System.currentTimeMillis() - lastReadTime;
@@ -690,20 +695,17 @@ public class ManipulatedProxyServer implements Runnable {
         }
     }
 
-    private volatile String key = null;
+    private volatile String key = "";
 
     private String getKey() {
         Window window;
         StringBuilder sb = new StringBuilder();
+        sb.append(key);
         while ((window = taskQueue.poll()) != null) {
             sb.append(window.key);
         }
-        String s = sb.toString();
-        if (StringUtils.isEmpty(s) && key != null) {
-            return key;
-        }
-        key = s;
-        return s;
+        key = sb.toString();
+        return sb.toString();
     }
 
     private void readWindowOut(InputStream in, BlockingDeque<Window> windowQueue) throws IOException {
