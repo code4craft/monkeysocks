@@ -124,7 +124,6 @@ public class Servers {
         Properties pr = new Properties();
 
         try {
-            System.out.println(SOCKS.class.getClassLoader().getResource(file_name).getFile());
             InputStream fin = SOCKS.class.getClassLoader().getResourceAsStream(file_name);
             pr.load(fin);
             fin.close();

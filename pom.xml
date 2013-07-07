@@ -7,7 +7,7 @@
     <groupId>com.dianping</groupId>
     <artifactId>monkeysocks</artifactId>
     <packaging>pom</packaging>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.2-SNAPSHOT</version>
     <name>monkey-socks</name>
     <url>https://github.com/code4craft/monkeysocks</url>
 

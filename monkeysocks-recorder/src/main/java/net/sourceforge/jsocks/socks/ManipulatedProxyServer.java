@@ -47,6 +47,10 @@ public class ManipulatedProxyServer implements Runnable {
     static final int PIPE_MODE = 2;
     static final int ABORT_MODE = 3;
 
+    int port;
+    String ip;
+
+
     final ManipulateStat manipulateStat;
 
     public static enum ManipulateStat {
@@ -260,7 +264,6 @@ public class ManipulatedProxyServer implements Runnable {
                     writeToClient();
                 } catch (IOException ioe) {
                     //log("Accept exception:"+ioe);
-                    ioe.printStackTrace();
                     handleException(ioe);
                 } finally {
                     abort();
@@ -271,7 +274,7 @@ public class ManipulatedProxyServer implements Runnable {
                 try {
                     writeToClient();
                 } catch (IOException ioe) {
-                    ioe.printStackTrace();
+                    handleException(ioe);
                 } finally {
                     abort();
                     LOG.debug(connectionId + " Support thread(remote->client) stopped");
@@ -615,7 +618,6 @@ public class ManipulatedProxyServer implements Runnable {
             take = taskQueue.take();
             return take;
         } catch (InterruptedException e) {
-            e.printStackTrace();
             return null;
         }
     }
@@ -633,9 +635,9 @@ public class ManipulatedProxyServer implements Runnable {
                 if (!lastKey.equals(key0)) {
                     lastKey = key0;
                     List<Window> list = EhcacheClient.instance().get(key0);
-                    LOG.debug("get cache key " + key0);
+                    LOG.debug(connectionId + " get cache key " + key0);
                     if (list != null) {
-                        LOG.debug("get " + list.size() + " records from cache " + key0);
+                        LOG.debug(connectionId + " get " + list.size() + " records from cache " + key0);
                         for (Window window1 : list) {
                             out.write(window1.data);
                             out.flush();
@@ -695,17 +697,17 @@ public class ManipulatedProxyServer implements Runnable {
         }
     }
 
-    private volatile String key = "";
+    private volatile String key = null;
 
     private String getKey() {
         Window window;
         StringBuilder sb = new StringBuilder();
-        sb.append(key);
+        sb.append(msg.host + ":" + msg.port);
         while ((window = taskQueue.poll()) != null) {
-            sb.append(window.key);
+            sb.append("_" + window.key);
         }
         key = sb.toString();
-        return sb.toString();
+        return key;
     }
 
     private void readWindowOut(InputStream in, BlockingDeque<Window> windowQueue) throws IOException {
@@ -746,12 +748,18 @@ public class ManipulatedProxyServer implements Runnable {
                 }
                 saveToCache(list);
                 readBuffer.clear();
-                for (Window window : list) {
-                    windowLen += window.length;
-                    LOG.debug("buff len " + bufLen + " window len " + windowLen);
-                    out.write(window.data);
-                    out.flush();
+                try {
+                    for (Window window : list) {
+                        windowLen += window.length;
+                        LOG.debug(connectionId + " buff len " + bufLen + " window len " + windowLen);
+                        out.write(window.data);
+                        out.flush();
+                    }
+                } catch (Exception e) {
+                    LOG.debug(connectionId + getKey());
+                    e.printStackTrace();
                 }
+
             } catch (InterruptedIOException iioe) {
                 if (iddleTimeout == 0) return;//Other thread interrupted us.
                 long timeSinceRead = System.currentTimeMillis() - lastReadTime;
@@ -764,7 +772,7 @@ public class ManipulatedProxyServer implements Runnable {
 
     private void saveToCache(List<Window> list) {
         String key = getKey();
-        LOG.debug("save " + key + " to cache " + list);
+        LOG.debug(connectionId + " save " + key + " to cache " + list);
         if (EhcacheClient.instance().get(key) != null) {
             List<Window> listAll = EhcacheClient.instance().get(key);
             listAll.addAll(list);
