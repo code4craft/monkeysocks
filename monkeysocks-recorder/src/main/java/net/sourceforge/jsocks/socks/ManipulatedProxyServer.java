@@ -5,6 +5,7 @@ import com.dianping.monkeysocks.manipulate.ProtocalHandler;
 import net.sourceforge.jsocks.socks.server.ServerAuthenticator;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.*;
@@ -71,7 +72,7 @@ public class ManipulatedProxyServer implements Runnable {
         }
     }
 
-    static final int BUF_SIZE = 1024;
+    static final int BUF_SIZE = 8192;
 
     static final int WINDOWS_SIZE = 1024;
 
@@ -80,7 +81,6 @@ public class ManipulatedProxyServer implements Runnable {
 
     static int iddleTimeout = 180000; //3 minutes
     static int acceptTimeout = 180000; //3 minutes
-    ByteBuffer readBuffer = ByteBuffer.allocate(WINDOWS_SIZE * 200);
 
     private static final Logger LOG = Logger.getLogger(ProxyServer.class);
 
@@ -246,7 +246,6 @@ public class ManipulatedProxyServer implements Runnable {
                     startSession();
                 } catch (IOException ioe) {
                     handleException(ioe);
-                    ioe.printStackTrace();
                 } finally {
                     abort();
                     if (auth != null) auth.endSession();
@@ -605,19 +604,9 @@ public class ManipulatedProxyServer implements Runnable {
         if (manipulateStat == ManipulateStat.NONE) {
             pipe(in, remote_out);
         } else if (manipulateStat == ManipulateStat.RECORD) {
-            readWindow(in, readWindowQueue);
-            Window window;
-            while ((window = readWindowQueue.poll()) != null) {
-                taskQueue.add(window);
-                remote_out.write(window.data);
-                remote_out.flush();
-            }
+            readWindowIn(in, readWindowQueue);
         } else if (manipulateStat == ManipulateStat.REPLAY) {
-            readWindow(in, readWindowQueue);
-            Window window;
-            while ((window = readWindowQueue.poll()) != null) {
-                taskQueue.add(window);
-            }
+            readWindowIn(in, readWindowQueue);
         }
     }
 
@@ -628,7 +617,7 @@ public class ManipulatedProxyServer implements Runnable {
             return take;
         } catch (InterruptedException e) {
             e.printStackTrace();
-            return readFromQueue(taskQueue);
+            return null;
         }
     }
 
@@ -636,69 +625,59 @@ public class ManipulatedProxyServer implements Runnable {
         if (manipulateStat == ManipulateStat.NONE) {
             pipe(remote_in, out);
         } else if (manipulateStat == ManipulateStat.RECORD) {
-            Window window;
-            StringBuilder sb = new StringBuilder();
-            while ((window = readFromQueue(taskQueue)) != null) {
-                sb.append(window.key);
-            }
-            String key = sb.toString();
-            Thread thread = new Thread(){
-                @Override
-                public void run() {
-                    try {
-                        readWindow(remote_in, writeWindowQueue);
-                    } catch (IOException e) {
-                        e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            readWindowOut(remote_in, writeWindowQueue);
+        } else if (manipulateStat == ManipulateStat.REPLAY) {
+            while (true) {
+                lastReadTime = System.currentTimeMillis();
+                String key0 = getKey();
+                List<Window> list = EhcacheClient.instance().get(key0);
+                if (list != null) {
+                    for (Window window1 : list) {
+                        out.write(window1.data);
+                        out.flush();
                     }
                 }
-            };
-            thread.start();
-            List<Window> list = new ArrayList<Window>();
-            while ((window = readFromQueue(taskQueue)) != null) {
-                list.add(window);
-            }
-            LOG.debug("save " + key + " to cache " + list);
-            EhcacheClient.instance().set(key, list, Integer.MAX_VALUE);
-            for (Window window1 : list) {
-                out.write(window1.data);
-                out.flush();
-            }
-        } else if (manipulateStat == ManipulateStat.REPLAY) {
-            Window window;
-            StringBuilder sb = new StringBuilder();
-            while ((window = readFromQueue(taskQueue)) != null) {
-                sb.append(window.key);
-            }
-            String key = sb.toString();
-            List<Window> list = EhcacheClient.instance().get(key);
-            for (Window window1 : list) {
-                out.write(window1.data);
-                out.flush();
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    if (iddleTimeout == 0) return;//Other thread interrupted us.
+                    long timeSinceRead = System.currentTimeMillis() - lastReadTime;
+                    if (timeSinceRead >= iddleTimeout - 1000) //-1s for adjustment.
+                        return;
+                }
             }
         }
     }
 
-    private void readWindow(InputStream in, BlockingDeque<Window> windowQueue) throws IOException {
+    private void readWindowIn(InputStream in, BlockingDeque<Window> windowQueue) throws IOException {
+        ByteBuffer readBuffer = ByteBuffer.allocate(WINDOWS_SIZE * 200);
         lastReadTime = System.currentTimeMillis();
         byte[] buf = new byte[BUF_SIZE];
         int len = 0;
         while (len >= 0) {
             try {
                 len = in.read(buf);
+                if (len < 0) {
+                    break;
+                }
+                remote_out.write(buf, 0, len);
+                remote_out.flush();
                 readBuffer.put(buf, 0, len);
                 lastReadTime = System.currentTimeMillis();
                 int length = readBuffer.position();
                 readBuffer.flip();
                 for (int i = 0; i < (length - 1) / WINDOWS_SIZE + 1; i++) {
-                    byte[] data = new byte[WINDOWS_SIZE];
-                    for (int j = 0; j < WINDOWS_SIZE; j++) {
-                        try {
-                            data[i] = readBuffer.get();
-                        } catch (BufferUnderflowException e) {
-                            break;
-                        }
+                    int windowSize = WINDOWS_SIZE;
+                    if (i == (length - 1) / WINDOWS_SIZE) {
+                        windowSize = (length - 1) % WINDOWS_SIZE + 1;
                     }
-                    windowQueue.add(new Window(data, WINDOWS_SIZE));
+                    byte[] data = new byte[windowSize];
+                    for (int j = 0; j < windowSize; j++) {
+                        data[j] = readBuffer.get();
+                    }
+                    Window window = new Window(data, windowSize);
+                    windowQueue.add(window);
+                    taskQueue.add(window);
                 }
                 readBuffer.clear();
             } catch (InterruptedIOException iioe) {
@@ -707,9 +686,88 @@ public class ManipulatedProxyServer implements Runnable {
                 if (timeSinceRead >= iddleTimeout - 1000) //-1s for adjustment.
                     return;
                 len = 0;
-            } catch (Exception e) {
-                e.printStackTrace();
             }
+        }
+    }
+
+    private volatile String key = null;
+
+    private String getKey() {
+        Window window;
+        StringBuilder sb = new StringBuilder();
+        while ((window = taskQueue.poll()) != null) {
+            sb.append(window.key);
+        }
+        String s = sb.toString();
+        if (StringUtils.isEmpty(s) && key != null) {
+            return key;
+        }
+        key = s;
+        return s;
+    }
+
+    private void readWindowOut(InputStream in, BlockingDeque<Window> windowQueue) throws IOException {
+        ByteBuffer readBuffer = ByteBuffer.allocate(WINDOWS_SIZE * 200);
+        lastReadTime = System.currentTimeMillis();
+        byte[] buf = new byte[BUF_SIZE];
+        int len = 0;
+        int bufLen = 0;
+        int windowLen = 0;
+        while (len >= 0) {
+            try {
+                len = in.read(buf);
+                bufLen += len;
+                if (len < 0) {
+                    break;
+                }
+                readBuffer.put(buf, 0, len);
+                lastReadTime = System.currentTimeMillis();
+                int length = readBuffer.position();
+                readBuffer.flip();
+                List<Window> list = new ArrayList<Window>();
+                for (int i = 0; i < (length - 1) / WINDOWS_SIZE + 1; i++) {
+                    int windowSize = WINDOWS_SIZE;
+                    if (i == (length - 1) / WINDOWS_SIZE) {
+                        windowSize = (length - 1) % WINDOWS_SIZE + 1;
+                    }
+                    byte[] data = new byte[windowSize];
+                    for (int j = 0; j < windowSize; j++) {
+                        try {
+                            data[j] = readBuffer.get();
+                        } catch (BufferUnderflowException e) {
+                            break;
+                        }
+                    }
+                    Window window = new Window(data, windowSize);
+                    windowQueue.add(window);
+                    list.add(window);
+                }
+                saveToCache(list);
+                readBuffer.clear();
+                for (Window window : list) {
+                    windowLen += window.length;
+                    LOG.debug("buff len " + bufLen + " window len " + windowLen);
+                    out.write(window.data);
+                    out.flush();
+                }
+            } catch (InterruptedIOException iioe) {
+                if (iddleTimeout == 0) return;//Other thread interrupted us.
+                long timeSinceRead = System.currentTimeMillis() - lastReadTime;
+                if (timeSinceRead >= iddleTimeout - 1000) //-1s for adjustment.
+                    return;
+                len = 0;
+            }
+        }
+    }
+
+    private void saveToCache(List<Window> list) {
+        String key = getKey();
+        LOG.debug("save " + key + " to cache " + list);
+        if (EhcacheClient.instance().get(key) != null) {
+            List<Window> listAll = EhcacheClient.instance().get(key);
+            listAll.addAll(list);
+        } else {
+            EhcacheClient.instance().set(key, list, Integer.MAX_VALUE);
         }
     }
 

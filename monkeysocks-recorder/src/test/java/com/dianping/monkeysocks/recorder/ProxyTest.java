@@ -20,8 +20,8 @@ public class ProxyTest {
     public void testProxy() throws IOException {
         Properties properties = System.getProperties();
         properties.setProperty("socksProxyHost", "127.0.0.1");
-        properties.setProperty("socksProxyPort", "1080");
-        URL url = new URL("http://dl.360safe.com/mac/safe/360InternetSecurity.dmg");
+        properties.setProperty("socksProxyPort", "1081");
+        URL url = new URL("http://ruby-china.org/");
         URLConnection urlConnection = url.openConnection();
         urlConnection.connect();
         String s = IOUtils.toString(urlConnection.getInputStream());

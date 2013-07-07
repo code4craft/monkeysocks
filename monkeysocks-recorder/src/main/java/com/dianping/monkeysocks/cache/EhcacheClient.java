@@ -5,7 +5,6 @@ import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
 import org.apache.log4j.Logger;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,7 +50,7 @@ public class EhcacheClient {
     public void init() {
         InputStream inputStream = null;
         try {
-            inputStream = EhcacheClient.class.getResourceAsStream(CACHE_CONF);
+            inputStream = EhcacheClient.class.getClassLoader().getResourceAsStream(CACHE_CONF);
             if (manager == null) {
                 synchronized (EhcacheClient.class) {
                     if (manager == null) {
@@ -78,7 +77,7 @@ public class EhcacheClient {
         } finally {
             try {
                 inputStream.close();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 logger.warn("close error", e);
             }
             inputStream = null;
