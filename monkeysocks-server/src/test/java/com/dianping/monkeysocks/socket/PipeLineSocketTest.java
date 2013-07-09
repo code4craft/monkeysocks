@@ -1,5 +1,6 @@
 package com.dianping.monkeysocks.socket;
 
+import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -12,9 +13,23 @@ import java.io.IOException;
  */
 public class PipeLineSocketTest {
 
+    @Test
+    public void testReadAndWriteArray() throws IOException {
+        String text = "@author yihua.huang@dianping.com <br>\n" +
+                " * @date: 13-7-8 <br>\n" +
+                " * Time: 下午8:40 <br>";
+        byte[] bytes = text.getBytes();
+        final PipeLineSocket pipeLineSocket = new PipeLineSocket();
+        pipeLineSocket.getOutputStream().write(bytes);
+        byte[] bytesRead = new byte[bytes.length];
+        pipeLineSocket.getInputStream().read(bytesRead);
+        String s = new String(bytesRead);
+        Assert.assertEquals(text,s);
+    }
+
     @Ignore(value = "infinity")
     @Test
-    public void test() throws IOException {
+    public void testConcurrentReadAndWrite() throws IOException {
         final PipeLineSocket pipeLineSocket = new PipeLineSocket();
         new Thread() {
             @Override
@@ -64,6 +79,5 @@ public class PipeLineSocketTest {
             int read = pipeLineSocket.getInputStream().read();
             System.out.println(read);
         }
-
     }
 }
