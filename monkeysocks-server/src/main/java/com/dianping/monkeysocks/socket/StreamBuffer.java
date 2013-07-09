@@ -41,12 +41,9 @@ public class StreamBuffer {
     }
 
     public byte read() {
-        if (writePointer < readPointer) {
-            throw new IllegalStateException();
-        }
         try {
             lock.lock();
-            full.signalAll();
+            full.signal();
             if (readPointer >= writePointer) {
                 empty.await();
             }
@@ -61,12 +58,9 @@ public class StreamBuffer {
     }
 
     public void write(byte b) {
-        if (writePointer < readPointer) {
-            throw new IllegalStateException();
-        }
         try {
             lock.lock();
-            empty.signalAll();
+            empty.signal();
             buffer[writePointer % capacity] = b;
             //end
             if (writePointer - readPointer >= capacity) {

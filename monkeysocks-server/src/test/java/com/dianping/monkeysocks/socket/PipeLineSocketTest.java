@@ -19,7 +19,7 @@ public class PipeLineSocketTest {
             public void run() {
                 for (int i = 0; i < 1000000; i++) {
                     try {
-                        pipeLineSocket.getOutputStream().write((byte)i%100);
+                        pipeLineSocket.getOutputStream().write((byte) i % 100);
                         Thread.sleep(10);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -29,9 +29,24 @@ public class PipeLineSocketTest {
                 }
             }
         }.start();
-        for (int i = 0; i < 1000000; i++){
+        new Thread() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 1000000; i++) {
+                    int read = 0;
+                    try {
+                        read = pipeLineSocket.getInputStream().read();
+                        System.out.println("t " + read);
+                    } catch (IOException e) {
+                        e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                    }
+                }
+            }
+        }.start();
+        for (int i = 0; i < 1000000; i++) {
             int read = pipeLineSocket.getInputStream().read();
             System.out.println(read);
         }
+
     }
 }
