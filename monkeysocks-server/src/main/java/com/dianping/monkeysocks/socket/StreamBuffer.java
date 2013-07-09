@@ -43,30 +43,31 @@ public class StreamBuffer {
     public byte read() {
         try {
             lock.lock();
-            full.signal();
-            if (readPointer >= writePointer) {
+            while (readPointer >= writePointer) {
                 empty.await();
             }
+            byte b = buffer[readPointer % capacity];
+            readPointer++;
+            full.signal();
             //end
+            return b;
         } catch (InterruptedException e) {
         } finally {
             lock.unlock();
         }
-        byte b = buffer[readPointer % capacity];
-        readPointer++;
-        return b;
+        return 0;
     }
 
     public void write(byte b) {
         try {
             lock.lock();
-            empty.signal();
-            buffer[writePointer % capacity] = b;
             //end
-            if (writePointer - readPointer >= capacity) {
+            while (writePointer - readPointer >= capacity) {
                 full.await();
             }
+            buffer[writePointer % capacity] = b;
             writePointer++;
+            empty.signal();
         } catch (InterruptedException e) {
         } finally {
             lock.unlock();

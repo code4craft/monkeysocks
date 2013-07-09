@@ -1,5 +1,6 @@
 package com.dianping.monkeysocks.socket;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.io.IOException;
  */
 public class PipeLineSocketTest {
 
+    @Ignore(value = "infinity")
     @Test
     public void test() throws IOException {
         final PipeLineSocket pipeLineSocket = new PipeLineSocket();
@@ -19,7 +21,22 @@ public class PipeLineSocketTest {
             public void run() {
                 for (int i = 0; i < 1000000; i++) {
                     try {
-                        pipeLineSocket.getOutputStream().write((byte) i % 100);
+                        pipeLineSocket.getOutputStream().write((byte) 2);
+                        Thread.sleep(10);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }.start();
+        new Thread() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 1000000; i++) {
+                    try {
+                        pipeLineSocket.getOutputStream().write((byte) 1);
                         Thread.sleep(10);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -38,7 +55,7 @@ public class PipeLineSocketTest {
                         read = pipeLineSocket.getInputStream().read();
                         System.out.println("t " + read);
                     } catch (IOException e) {
-                        e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                        e.printStackTrace();
                     }
                 }
             }
