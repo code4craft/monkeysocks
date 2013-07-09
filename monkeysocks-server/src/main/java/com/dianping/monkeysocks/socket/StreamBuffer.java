@@ -49,7 +49,6 @@ public class StreamBuffer {
             byte b = buffer[readPointer % capacity];
             readPointer++;
             full.signal();
-            //end
             return b;
         } catch (InterruptedException e) {
         } finally {
@@ -61,7 +60,6 @@ public class StreamBuffer {
     public void write(byte b) {
         try {
             lock.lock();
-            //end
             while (writePointer - readPointer >= capacity) {
                 full.await();
             }
