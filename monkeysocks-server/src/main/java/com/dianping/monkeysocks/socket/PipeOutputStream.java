@@ -2,7 +2,6 @@ package com.dianping.monkeysocks.socket;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 
 /**
  * @author yihua.huang@dianping.com <br>
@@ -11,14 +10,14 @@ import java.nio.ByteBuffer;
  */
 public class PipeOutputStream extends OutputStream{
 
-    private ByteBuffer byteBuffer;
+    private StreamBuffer streamBuffer;
 
-    public PipeOutputStream(ByteBuffer byteBuffer) {
-        this.byteBuffer = byteBuffer;
+    public PipeOutputStream(StreamBuffer streamBuffer) {
+        this.streamBuffer = streamBuffer;
     }
 
     @Override
     public void write(int b) throws IOException {
-        byteBuffer.put((byte)b);
+        streamBuffer.write((byte)b);
     }
 }

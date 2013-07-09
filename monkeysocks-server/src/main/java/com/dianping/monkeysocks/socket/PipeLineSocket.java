@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 
 /**
  * @author yihua.huang@dianping.com <br>
@@ -17,13 +16,12 @@ public class PipeLineSocket extends Socket{
 
     private PipeOutputStream outputStream;
 
-    private ByteBuffer byteBuffer;
+    private StreamBuffer streamBuffer;
 
     public PipeLineSocket(){
-        byteBuffer=ByteBuffer.allocate(10000);
-        inputStream=new PipeInputStream(byteBuffer);
-        outputStream = new PipeOutputStream(byteBuffer);
-
+        streamBuffer=StreamBuffer.allocate(10000);
+        inputStream=new PipeInputStream(streamBuffer);
+        outputStream = new PipeOutputStream(streamBuffer);
     }
 
     @Override

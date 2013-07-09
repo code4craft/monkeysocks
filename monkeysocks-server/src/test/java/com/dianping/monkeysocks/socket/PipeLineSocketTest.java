@@ -13,9 +13,25 @@ public class PipeLineSocketTest {
 
     @Test
     public void test() throws IOException {
-        PipeLineSocket pipeLineSocket = new PipeLineSocket();
-        pipeLineSocket.getOutputStream().write(1);
-        int read = pipeLineSocket.getInputStream().read();
-        System.out.println(read);
+        final PipeLineSocket pipeLineSocket = new PipeLineSocket();
+        new Thread() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 1000000; i++) {
+                    try {
+                        pipeLineSocket.getOutputStream().write((byte)i%100);
+                        Thread.sleep(10);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }.start();
+        for (int i = 0; i < 1000000; i++){
+            int read = pipeLineSocket.getInputStream().read();
+            System.out.println(read);
+        }
     }
 }
