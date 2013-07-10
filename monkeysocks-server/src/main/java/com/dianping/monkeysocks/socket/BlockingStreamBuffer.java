@@ -21,6 +21,8 @@ public class BlockingStreamBuffer {
 
     private int writePointer;
 
+    private int flushPointer = Integer.MAX_VALUE;
+
     private ReentrantLock lock;
 
     private Condition full;
@@ -46,10 +48,14 @@ public class BlockingStreamBuffer {
     }
 
     public int read() throws IOException {
+        if (readPointer >= flushPointer) {
+            flushPointer = Integer.MAX_VALUE;
+            return -1;
+        }
         try {
             lock.lock();
             while (readPointer >= writePointer) {
-                if (writeClosed){
+                if (writeClosed) {
                     return -1;
                 }
                 empty.await();
@@ -69,7 +75,7 @@ public class BlockingStreamBuffer {
         try {
             lock.lock();
             while (writePointer - readPointer >= capacity) {
-                if (readClosed){
+                if (readClosed) {
                     throw new IOException("Buffer is full");
                 }
                 full.await();
@@ -88,7 +94,12 @@ public class BlockingStreamBuffer {
     }
 
     public void closeWrite() throws IOException {
+        flushPointer = writePointer;
         writeClosed = true;
+    }
+
+    public void flush() throws IOException {
+        flushPointer = writePointer;
     }
 
 }

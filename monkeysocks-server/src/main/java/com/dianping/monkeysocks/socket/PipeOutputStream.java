@@ -27,6 +27,11 @@ public class PipeOutputStream extends OutputStream{
     }
 
     @Override
+    public void flush() throws IOException {
+        blockingStreamBuffer.flush();
+    }
+
+    @Override
     public void close() throws IOException {
         closed = true;
         blockingStreamBuffer.closeWrite();
