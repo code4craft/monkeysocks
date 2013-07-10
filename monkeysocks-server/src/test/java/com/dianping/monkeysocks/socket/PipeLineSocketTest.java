@@ -19,10 +19,10 @@ public class PipeLineSocketTest {
                 " * @date: 13-7-8 <br>\n" +
                 " * Time: 下午8:40 <br>";
         byte[] bytes = text.getBytes();
-        bytes[bytes.length - 1] = -1;
         final PipeLineSocket pipeLineSocket = new PipeLineSocket();
         pipeLineSocket.getOutputStream().write(bytes);
-        byte[] bytesRead = new byte[bytes.length + 2];
+        pipeLineSocket.getOutputStream().close();
+        byte[] bytesRead = new byte[bytes.length];
         pipeLineSocket.getInputStream().read(bytesRead);
         String s = new String(bytesRead);
         Assert.assertEquals(text, s);
