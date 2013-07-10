@@ -1,5 +1,6 @@
 package com.dianping.monkeysocks.socket;
 
+import java.io.IOException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -10,7 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @date: 13-7-9 <br>
  * Time: 下午8:21 <br>
  */
-public class StreamBuffer {
+public class BlockingStreamBuffer {
 
     private byte[] buffer;
 
@@ -26,13 +27,17 @@ public class StreamBuffer {
 
     private Condition empty;
 
-    public static StreamBuffer allocate(int capacity) {
+    private boolean readClosed = false;
+
+    private boolean writeClosed = false;
+
+    public static BlockingStreamBuffer allocate(int capacity) {
         if (capacity <= 0)
             throw new IllegalArgumentException("capacity must greater than 0");
-        return new StreamBuffer(capacity);
+        return new BlockingStreamBuffer(capacity);
     }
 
-    StreamBuffer(int capacity) {
+    BlockingStreamBuffer(int capacity) {
         this.capacity = capacity;
         this.buffer = new byte[capacity];
         this.lock = new ReentrantLock();
@@ -40,16 +45,19 @@ public class StreamBuffer {
         this.empty = lock.newCondition();
     }
 
-    public byte read() {
+    public int read() throws IOException {
         try {
             lock.lock();
             while (readPointer >= writePointer) {
+                if (writeClosed){
+                    return -1;
+                }
                 empty.await();
             }
             byte b = buffer[readPointer % capacity];
             readPointer++;
             full.signal();
-            return b;
+            return b & 0xff;
         } catch (InterruptedException e) {
         } finally {
             lock.unlock();
@@ -57,19 +65,30 @@ public class StreamBuffer {
         return 0;
     }
 
-    public void write(byte b) {
+    public void write(int b) throws IOException {
         try {
             lock.lock();
             while (writePointer - readPointer >= capacity) {
+                if (readClosed){
+                    throw new IOException("Buffer is full");
+                }
                 full.await();
             }
-            buffer[writePointer % capacity] = b;
+            buffer[writePointer % capacity] = (byte) b;
             writePointer++;
             empty.signal();
         } catch (InterruptedException e) {
         } finally {
             lock.unlock();
         }
+    }
+
+    public void closeRead() throws IOException {
+        readClosed = true;
+    }
+
+    public void closeWrite() throws IOException {
+        writeClosed = true;
     }
 
 }

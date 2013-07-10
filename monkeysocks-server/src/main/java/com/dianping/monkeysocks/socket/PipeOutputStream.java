@@ -10,14 +10,26 @@ import java.io.OutputStream;
  */
 public class PipeOutputStream extends OutputStream{
 
-    private StreamBuffer streamBuffer;
+    private BlockingStreamBuffer blockingStreamBuffer;
 
-    public PipeOutputStream(StreamBuffer streamBuffer) {
-        this.streamBuffer = streamBuffer;
+    private boolean closed = false;
+
+    public PipeOutputStream(BlockingStreamBuffer blockingStreamBuffer) {
+        this.blockingStreamBuffer = blockingStreamBuffer;
     }
 
     @Override
     public void write(int b) throws IOException {
-        streamBuffer.write((byte)b);
+        if (closed){
+            throw new IOException("Stream is closed.");
+        }
+        blockingStreamBuffer.write((byte)b);
+    }
+
+    @Override
+    public void close() throws IOException {
+        closed = true;
+        blockingStreamBuffer.closeWrite();
+        blockingStreamBuffer = null;
     }
 }

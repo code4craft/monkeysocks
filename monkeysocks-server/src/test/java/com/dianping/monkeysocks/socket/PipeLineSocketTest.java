@@ -19,12 +19,13 @@ public class PipeLineSocketTest {
                 " * @date: 13-7-8 <br>\n" +
                 " * Time: 下午8:40 <br>";
         byte[] bytes = text.getBytes();
+        bytes[bytes.length - 1] = -1;
         final PipeLineSocket pipeLineSocket = new PipeLineSocket();
         pipeLineSocket.getOutputStream().write(bytes);
-        byte[] bytesRead = new byte[bytes.length];
+        byte[] bytesRead = new byte[bytes.length + 2];
         pipeLineSocket.getInputStream().read(bytesRead);
         String s = new String(bytesRead);
-        Assert.assertEquals(text,s);
+        Assert.assertEquals(text, s);
     }
 
     @Ignore(value = "infinity")
@@ -36,7 +37,7 @@ public class PipeLineSocketTest {
             public void run() {
                 for (int i = 0; i < 1000000; i++) {
                     try {
-                        pipeLineSocket.getOutputStream().write((byte) 2);
+                        pipeLineSocket.getOutputStream().write(i & 0xff);
                         Thread.sleep(10);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -80,4 +81,5 @@ public class PipeLineSocketTest {
             System.out.println(read);
         }
     }
+
 }
