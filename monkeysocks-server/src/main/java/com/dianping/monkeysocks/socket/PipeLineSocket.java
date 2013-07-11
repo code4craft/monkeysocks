@@ -38,4 +38,11 @@ public class PipeLineSocket extends Socket {
     public OutputStream getOutputStream() throws IOException {
         return outputStream;
     }
+
+    @Override
+    public synchronized void close() throws IOException {
+        super.close();
+        inputStream.close();
+        outputStream.close();
+    }
 }

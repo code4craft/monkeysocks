@@ -16,6 +16,5 @@ public class MysqlProcessor implements SocketProcessor {
 
     @Override
     public void run() {
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 }
