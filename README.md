@@ -6,7 +6,9 @@ monkeysocks
 
 Record network traffics and replay them for tests. Then you can run tests isolately without considering the unstable external dependencies.
 
-### 
+### Ways
+
+Set global socks proxy for Java.
 
 #### Old way we do Tests:
 
@@ -15,7 +17,3 @@ Record network traffics and replay them for tests. Then you can run tests isolat
 #### New way in MockSocks:
 
 ![image](https://raw.github.com/code4craft/monkeysocks/master/mocksocks-architect.png)
-
-### Ways
-
-Set global socks proxy for Java.
